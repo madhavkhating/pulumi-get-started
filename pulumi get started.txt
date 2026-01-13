@@ -1,0 +1,170 @@
+Pulumi get started:
+
+Pulumi is a modern infrastructure as code and secrets management platform that allows you to use familiar programming languages and tools to automate,
+secure and manage everything you run in the cloud. Pulumi IaC is free and open source.
+
+Download Pulumi:
+open this download page and choose your OS and downlaod and install then verify installation of Pulumi.
+https://www.pulumi.com/docs/get-started/download-install/
+
+> pulumi version
+
+Get Started: get started with simple project.
+Get started with Pulumi and AWS and deploy an AWS S3 bucket-based website using IaC, if you choose YAML as your language then you only need an AWS Account and Pulumi installed on your windows machine.
+https://www.pulumi.com/docs/iac/get-started/aws/
+
+Infrastructure as code (IaC): lets you deploy, change, and manage infrastructure safely, consistently, and repeatably using code rather than a graphical user interface.
+
+Configure access to AWS:
+Pulumi’s CLI needs access to your AWS account to manage cloud resources.
+	Install and configure the AWS CLI:
+	Download and run the AWS CLI MSI installer for Windows (64-bit):
+	https://awscli.amazonaws.com/AWSCLIV2.msi
+	Alternatively, you can run the msiexec command to run the MSI installer.
+	C:\>msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
+	Confirm the installation: 
+	C:\> aws --version
+	Configure the AWS access:
+	 retrieve your access key ID and secret access key and then set the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables on your workstation.
+	 To set for all sessions: replace keywoard with your actual values without double quotes.
+     C:\> setx AWS_ACCESS_KEY_ID "your access key"
+     C:\> setx AWS_SECRET_ACCESS_KEY "your secret key"
+     C:\> setx AWS_DEFAULT_REGION "region code"
+	 
+Testing access:
+To test that your AWS access is configured properly, run:
+
+>aws sts get-caller-identity
+
+If your AWS user ID, account, and ARN are printed, your configuration is correct. If not, read on:
+
+{
+    "UserId": "your user id",
+    "Account": "your account id",
+    "Arn": "arn"
+}
+
+Note: actual value are replaced with comments in above output.
+
+Create a new project:
+A project is a program in your chosen language that defines a collection of related cloud resources. In this step, you will create a new project.
+	Initializing your project:
+	Each project lives in its own directory. Create a new one:
+	>mkdir pulumi-start-aws
+	Change into the new directory:
+	>cd pulumi-start-aws
+	Now initialize a new Pulumi project for AWS using the pulumi new command:
+	>pulumi new aws-yaml
+	you will be asked to login to pulumi hit Enter to login in using browser. you will have different option to login, you can use login using GitHub and give permission.
+	then enter details of project description, desired stack name, i used prod, AWS resion, I have used ap-south-1.
+	your new project is ready to go!
+    
+	Review your new project’s contents:
+	If you list the contents of your directory, you’ll see some key files:
+	Pulumi.yaml is a project file containing metadata about your project, like its name, as well as declaring your project’s resources
+	Pulumi.dev.yaml contains configuration values for the stack you just initialized
+	
+	Now examine the code in Pulumi.yaml : I use my favorite code editor VS Code, just open VS Code and open your project folder using file>open folder option.
+	The program declares an AWS S3 Bucket resource and exports its ID as a stack output. Resources are just objects in our language of choice with properties capturing their inputs and outputs. Exporting the bucket’s ID makes it convenient to use afterwards.
+
+Now you’re ready for your first deployment!
+
+	Deploy to AWS:
+	Now run pulumi up to start deploying your new S3 bucket: in yout VS Code go to Terminal>New Terminal and new Terminal will open , make sure type is powershell and your current directory is your project directory.
+	>pulumi up
+	This command first shows you a preview of the changes that will be made.
+	To proceed and deploy your new S3 bucket, select yes. This begins an update.
+	The bucket ID can be accessed with the pulumi stack output command.
+	>aws s3 ls ("s3://" + (pulumi stack output bucketName))
+
+Now that the S3 bucket has been provisioned, you’ll update it to host a static website.
+	Make an update:
+	Now you will update your project to serve a static website out of your AWS S3 bucket. You will change your code and then re-run pulumi up which will update your infrastructure.
+			Add new resources:
+			Pulumi knows how to evolve your current infrastructure to your project’s new desired state, both for the first deployment as well as subsequent updates.
+			To turn your bucket into a static website, start by adding three new AWS S3 resources:
+			BucketWebsiteConfiguration: configures your bucket as a website
+			BucketOwnershipControls: allows bucket access controls to be configured
+			BucketPublicAccessBlock: permits public access to your bucket; this is disabled by default so you don’t allow access over the Internet by accident
+			Open up Pulumi.yaml in your editor and add them right after your S3 bucket:
+			# ...
+			resources:
+			  # Bucket ...
+
+			  # Turn the bucket into a website:
+			  website:
+				type: aws:s3:BucketWebsiteConfiguration
+				properties:
+				  bucket: ${my-bucket.id}
+				  indexDocument:
+					suffix: index.html
+
+			  # Permit access control configuration:
+			  ownership-controls:
+				type: aws:s3:BucketOwnershipControls
+				properties:
+				  bucket: ${my-bucket.id}
+				  rule:
+					objectOwnership: ObjectWriter
+
+			  # Enable public access to the website:
+			  public-access-block:
+				type: aws:s3:BucketPublicAccessBlock
+				properties:
+				  bucket: ${my-bucket.id}
+				  blockPublicAcls: false
+			Note: get code here and make sure yaml indentation is correct.
+			https://www.pulumi.com/docs/iac/get-started/aws/modify-program/
+			
+			Next, add a new file called index.html to your current directory with these contents:
+			<html>
+				<body>
+					<h1>Hello, Pulumi!</h1>
+				</body>
+			</html>
+			
+			Then open Pulumi.yaml and create a BucketObject after the three other new resources:
+			# ...
+			resources:
+			  # Other resources ...
+
+			  # Create an S3 Bucket object
+			  index.html:
+				type: aws:s3:BucketObject
+				properties:
+				  bucket: ${my-bucket.id}
+				  source:
+					fn::fileAsset: index.html
+				  contentType: text/html
+				  acl: public-read
+				options:
+				  dependsOn:
+					- ${ownership-controls}
+					- ${public-access-block}
+			
+
+			Note: make sure yaml indentation is correct.
+			This uploads the index.html file to your bucket using a Pulumi concept called an asset.
+			Now to export the website’s URL for easy access add this to the end of your program:
+			# ...
+			outputs:
+			  # ...
+			  url: http://${website.websiteEndpoint}
+			  
+			Save Pulumi.yaml file.
+			
+			Deploy the changes:
+			To deploy the changes, run pulumi up again and it will figure out the deltas:
+			>pulumi up
+			Choose yes to perform the deployment:
+			In just a few seconds, your new website will be ready. Curl the endpoint to see it live:
+			>curl (pulumi stack output url)
+			
+
+
+	
+	
+	
+
+
+
