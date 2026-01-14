@@ -6,6 +6,7 @@ resources:
   my-bucket:
     type: aws:s3:Bucket
 
+  # Turn the bucket into a website:
   website:
     type: aws:s3:BucketWebsiteConfiguration
     properties:
@@ -27,7 +28,8 @@ resources:
     properties:
       bucket: ${my-bucket.id}
       blockPublicAcls: false
-
+  
+  # Create an S3 Bucket object
   index.html:
     type: aws:s3:BucketObject
     properties:
